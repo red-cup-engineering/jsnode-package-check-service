@@ -202,6 +202,47 @@ function checkM3(dir, manifest, observations) {
   return finding("M3", "adapted", "clean", observations.length + " declared export target(s) exist as files inside the package");
 }
 
+
+// A declared package command is a separate public surface from ESM exports.
+// npm accepts paths with or without "./" in "bin"; neither an escaping path
+// nor a path to a directory is evidence of a valid executable file.
+// This is a read-only source assay, not a proof the command can safely execute.
+function inspectBinTargets(dir, bin) {
+  const entries = typeof bin === "string"
+    ? [["<package>", bin]]
+    : bin && typeof bin === "object" && !Array.isArray(bin)
+      ? Object.entries(bin)
+      : [];
+  return Object.freeze(entries.map(([command, target]) => {
+    if (typeof target !== "string" || target.length === 0 ||
+        target.includes("\\") || target.includes("*") ||
+        target.startsWith("/") || /^[a-z]:/iu.test(target) ||
+        target.includes("\0")) {
+      return Object.freeze({ command, target, withinPackage: false, exists: false });
+    }
+    const normalized = target.startsWith("./") ? target : `./${target}`;
+    return Object.freeze({ command, target, ...observeExportTarget(dir, normalized) });
+  }));
+}
+
+function checkM6(manifest, observations) {
+  if (!Object.hasOwn(manifest, "bin"))
+    return finding("M6", "adapted", "informational", "no declared bin surface; library-only packages need none");
+  const bin = manifest.bin;
+  const isMap = bin !== null && typeof bin === "object" && !Array.isArray(bin);
+  if (typeof bin !== "string" && !isMap)
+    return finding("M6", "adapted", "violation", "bin must be a path string or command-to-path map");
+  if (observations.length === 0)
+    return finding("M6", "adapted", "violation", "bin declares no command target");
+  const bad = observations.filter(({ command, withinPackage, exists }) =>
+    !command || !withinPackage || exists !== true);
+  if (bad.length > 0)
+    return finding("M6", "adapted", "violation",
+      "bin targets must be regular in-package files: " +
+      bad.map(({ command, target }) => `${command} -> ${String(target)}`).join("; "));
+  return finding("M6", "adapted", "clean", `${observations.length} declared bin target(s) exist as files inside the package`);
+}
+
 function checkM4(manifest, kind) {
   if (kind === "content-records") return finding("M4", "adapted", "informational", "content package has no JS lifecycle script requirement");
   const scripts = manifest.scripts ?? {};
@@ -355,7 +396,7 @@ function checkD1(dir) {
  * Each subject pins the checked manifest, inspected source content, observed
  * exported-file existence, and the checker source itself.
  */
-function witnessedPackageCells(findings, { dir, layer, kind, manifest, manifestSource, texts, checkerSource, exportTargets, uninspectedSourceEntries }) {
+function witnessedPackageCells(findings, { dir, layer, kind, manifest, manifestSource, texts, checkerSource, exportTargets, binTargets, uninspectedSourceEntries }) {
   const manifestField = (key) => Object.hasOwn(manifest, key) ? manifest[key] : null;
   const scannedSources = texts.map(({ file, text }) => Object.freeze({
     path: relative(dir, file),
@@ -378,6 +419,7 @@ function witnessedPackageCells(findings, { dir, layer, kind, manifest, manifestS
     M1: { name: manifestField("name"), directoryName: basename(dir) },
     M2: { private: manifestField("private"), type: manifestField("type"), packageKind: kind },
     M3: { exports: manifestField("exports"), exportTargets },
+    M6: { bin: manifestField("bin"), binTargets },
     M4: { scripts: manifestField("scripts"), packageKind: kind },
     L1: { layer, dependencies: manifestField("dependencies") },
     L4: { layer, directoryName: basename(dir), dependencies: manifestField("dependencies") },
@@ -440,12 +482,14 @@ export async function checkJsnodePackage({ directory } = {}) {
     : checkedA3;
 
   const exportTargets = Object.freeze(rootExportTargets(manifest.exports).map((target) => observeExportTarget(dir, target)));
+  const binTargets = inspectBinTargets(dir, manifest.bin);
 
   const findings = [
     checkM1(dir, manifest),
     checkM2(manifest, kind),
     checkM2SideEffects(manifest, kind),
     checkM3(dir, manifest, exportTargets),
+    checkM6(manifest, binTargets),
     checkM4(manifest, kind),
     checkM5(manifest),
     checkL1(manifest, layer),
@@ -471,6 +515,6 @@ export async function checkJsnodePackage({ directory } = {}) {
     findings: Object.freeze(findings),
     violationCount,
     byConvention: Object.freeze(byConvention),
-    cells: witnessedPackageCells(findings, { dir, layer, kind, manifest, manifestSource, texts, checkerSource, exportTargets, uninspectedSourceEntries }),
+    cells: witnessedPackageCells(findings, { dir, layer, kind, manifest, manifestSource, texts, checkerSource, exportTargets, binTargets, uninspectedSourceEntries }),
   });
 }
