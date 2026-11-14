@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { address, cell } from "@red-cup-engineering/signcell/cell";
 
 // Ported from the legacy organizing-with-jsnode conformance/{check,kind,layer}.mts
@@ -164,12 +165,9 @@ function insidePackage(root, candidate) {
   return displaced !== ".." && !displaced.startsWith(".." + sep) && !isAbsolute(displaced);
 }
 
-function observeExportTarget(dir, target) {
-  const requested = resolve(dir, target);
-  if (!target.startsWith("./") || !insidePackage(dir, requested))
+function observeFileTarget(dir, target, requested) {
+  if (!insidePackage(dir, requested))
     return Object.freeze({ target, withinPackage: false, exists: false });
-  if (target.includes("*"))
-    return Object.freeze({ target, withinPackage: true, exists: null });
   try {
     const actual = realpathSync(requested);
     const withinPackage = insidePackage(realpathSync(dir), actual);
@@ -177,6 +175,33 @@ function observeExportTarget(dir, target) {
   } catch (error) {
     if (error?.code === "ENOENT" || error?.code === "ENOTDIR")
       return Object.freeze({ target, withinPackage: true, exists: false });
+    throw error;
+  }
+}
+
+function observeExportTarget(dir, target) {
+  if (!target.startsWith("./"))
+    return Object.freeze({ target, withinPackage: false, exists: false });
+  try {
+    // Exports are relative URLs, not npm bin filesystem paths. Validate before
+    // URL normalization can erase traversal, then let Node decode file identity.
+    const segments = decodeURIComponent(target.slice(2)).split(/[\\/]/u);
+    if (segments.some(segment => [".", "..", "node_modules"].includes(segment.toLowerCase())))
+      return Object.freeze({ target, withinPackage: false, exists: false });
+    const targetUrl = new URL(target, pathToFileURL(resolve(dir) + sep));
+    // ESM forbids encoded separators even on POSIX, where fileURLToPath alone
+    // permits %5c as a literal filename backslash. Decode exactly once.
+    if (/%(?:2f|5c)/iu.test(targetUrl.pathname))
+      return Object.freeze({ target, withinPackage: false, exists: false });
+    const requested = fileURLToPath(targetUrl);
+    if (requested.includes("\0") || !insidePackage(dir, requested))
+      return Object.freeze({ target, withinPackage: false, exists: false });
+    if (target.includes("*"))
+      return Object.freeze({ target, withinPackage: true, exists: null });
+    return observeFileTarget(dir, target, requested);
+  } catch (error) {
+    if (error instanceof URIError || error?.code === "ERR_INVALID_FILE_URL_PATH")
+      return Object.freeze({ target, withinPackage: false, exists: false });
     throw error;
   }
 }
@@ -221,7 +246,7 @@ function inspectBinTargets(dir, bin) {
       return Object.freeze({ command, target, withinPackage: false, exists: false });
     }
     const normalized = target.startsWith("./") ? target : `./${target}`;
-    return Object.freeze({ command, target, ...observeExportTarget(dir, normalized) });
+    return Object.freeze({ command, target, ...observeFileTarget(dir, normalized, resolve(dir, normalized)) });
   }));
 }
 
