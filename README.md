@@ -19,6 +19,15 @@ const { findings, violationCount, byConvention, cells } = report;
 
 The checker now also observes **M6**, the optional `package.json#bin` command-to-file boundary. A declared command must point to an existing, regular in-package file (including a file under `scripts/`); missing, escaped and out-of-package symlink targets are violations, while absent `bin` is informational and unwitnessed. This is an **observed path** claim, not proof of command execution, archive inclusion, runtime safety or deployability. Regression cases live in `test/check-jsnode-bin.test.mjs` and the owning [package-form specification](https://github.com/red-cup-engineering/jsnode-package-engineering-services-section/blob/main/content/text/documents/specifications/2026-10-28-jsnode-package-form-and-concurrent-boundaries.md).
 
+Export targets are relative URLs under Node's package contract. M3 decodes them
+with native file URL conversion before observing actual file type and symlink
+ownership. Encoded `#`, `?`, `%` and Unicode filenames therefore identify the
+same file as native ESM receiving, while malformed encodings, encoded separators
+and traversal cannot create a positive witness. npm `bin` targets remain literal
+filesystem paths, not URLs. Wildcard expansion and fallback selection remain
+unobserved; this is not a replacement for Node's complete package resolver.
+See [Node package target rules](https://nodejs.org/download/release/v24.22.1/docs/api/packages.html#path-rules-and-validation-for-export-targets).
+
 The established `JsnodePackageCheckReport`, its `JsnodePackageCheckFinding` entries, `violationCount`, and `byConvention` remain available to existing consumers. The additional `cells` array contains **native SignCell** predications `(inspected-source-revision, conforms-to-jsnode-rule, invariant-id)`, with actual source observations on `for` or `against`. SignCell, not this checker, determines their FOUR reading.
 
 Each cell's subject carries the content address of the manifest text, scanned source text, explicitly *uninspected* source entries, observed export-target presence/type/ownership and current checker source. Symlinks and other unresolved source entries cannot silently support a clean source-wide scan; a source-law finding with incomplete coverage remains unknown unless a specific negative witness was actually observed. The witness also identifies the evaluated rule and the selected input fields/inspection domain. Only manifest/file and source checks with recorded observations emit positive/negative witnesses. Retired, skipped, informational, wildcard-unknown or otherwise unobserved rules remain cells with **no evidence**; a report's lack of a violation is not independently a positive fact. A historical `law-allow` comment is not authority to cancel another finding. Those exceptions must be separately asserted and admitted by the actual policy owner.

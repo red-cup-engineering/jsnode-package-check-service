@@ -342,3 +342,50 @@ test("source-root symlinks outside package never enter a package's evidence scan
     assert.deepEqual(report.cells[0].subject.revision, a3Cell.subject.revision);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("M3 observes native export URL file identity without confusing bin paths", async (t) => {
+  const { pathToFileURL } = await import("node:url");
+  const root = await mkdtemp(join(tmpdir(), "jsnode-export-url-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const [index, filename] of ["value#1.mjs", "value?1.mjs", "value%20x.mjs", "value ü.mjs", "value%2fmjs.mjs"].entries()) {
+    const dir = join(root, "services", `example-${index}`);
+    await mkdir(join(dir, "src"), { recursive: true });
+    const name = `@test/example-${index}`;
+    const target = "./src/" + encodeURIComponent(filename);
+    await writeFile(join(dir, "src", filename), "export const value = 17;\n");
+    await writeManifest(dir, { name, private: true, type: "module", exports: target, bin: { example: "src/" + filename } });
+    await writeFile(join(dir, "receiver.mjs"), `export { value } from ${JSON.stringify(name)};\n`);
+    assert.equal((await import(pathToFileURL(join(dir, "receiver.mjs")))).value, 17);
+    const report = await checkJsnodePackage({ directory: dir });
+    assert.equal(report.findings.find(f => f.invariantId === "M3").status, "clean", target);
+    assert.equal(report.findings.find(f => f.invariantId === "M6").status, "clean", filename);
+    assert.deepEqual(report.cells.find(c => c.object === "M3").for[0].observed.exportTargets,
+      [{target,withinPackage:true,exists:true}]);
+  }
+});
+
+test("decoded export targets retain confinement and malformed targets cannot claim presence", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "jsnode-export-confinement-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dir = join(root, "services", "example");
+  await mkdir(join(dir, "src"), {recursive:true});
+  await writeFile(join(dir, "src", "entry.mjs"), "export const value = 1;");
+  // A real POSIX filename must not turn an ESM-invalid encoded separator into
+  // a false positive merely because filesystem conversion can find it.
+  await writeFile(join(dir, "src\\entry.mjs"), "export const value = 1;");
+  for (const target of ["./src/%2e%2e/entry.mjs", "./%2e%2e/entry.mjs", "./src%2fentry.mjs", "./src%5centry.mjs", "./src/%ZZ.mjs", "./src/%00.mjs", "./%6eode_modules/entry.mjs"]) {
+    await writeManifest(dir, {name:"@test/example",private:true,type:"module",exports:target});
+    const report = await checkJsnodePackage({directory:dir});
+    assert.equal(report.findings.find(f=>f.invariantId === "M3").status,"violation",target);
+    assert.equal(report.cells.find(c=>c.object === "M3").for.length,0,target);
+    const { spawnSync } = await import("node:child_process");
+    const native = spawnSync(process.execPath, ["--input-type=module", "--eval", 'await import("@test/example");'], {cwd:dir,encoding:"utf8"});
+    assert.equal(native.status,1,native.stdout+native.stderr);
+  }
+  await writeFile(join(root, "outside.mjs"), "export const outside = true;");
+  await symlink(join(root,"outside.mjs"),join(dir,"src","outside#1.mjs"));
+  await writeManifest(dir, {name:"@test/example",private:true,type:"module",exports:"./src/outside%231.mjs"});
+  const report = await checkJsnodePackage({directory:dir});
+  assert.equal(report.findings.find(f=>f.invariantId === "M3").status,"violation");
+  assert.equal(report.cells.find(c=>c.object === "M3").against[0].observed.exportTargets[0].withinPackage,false);
+});
