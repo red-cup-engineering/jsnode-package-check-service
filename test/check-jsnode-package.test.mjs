@@ -52,13 +52,13 @@ test("reports multiple violations for a package that breaks several invariants",
     await writeManifest(dir, {
       // M1: leaf "wrong-name" does not match directory "broken-widget-service"
       name: "@owner/wrong-name",
-      // M2: private is not true
-      private: false,
+      // M2: publication prohibition must be an actual boolean
+      private: "true",
       type: "module",
       description: "Broken on purpose.",
       // M3: exports does not resolve to an existing file
       exports: "./src/missing.mjs",
-      // M4: missing test and verify scripts
+      // M4: missing required test script
       scripts: { check: "node --check src/broken-widget.mjs" },
     });
     await writeFile(join(dir, "src/broken-widget.mjs"), "export function brokenWidget() {}\n", "utf8");
@@ -388,4 +388,47 @@ test("decoded export targets retain confinement and malformed targets cannot cla
   const report = await checkJsnodePackage({directory:dir});
   assert.equal(report.findings.find(f=>f.invariantId === "M3").status,"violation");
   assert.equal(report.cells.find(c=>c.object === "M3").against[0].observed.exportTargets[0].withinPackage,false);
+});
+
+
+test("publication intent is distinct from package conformance and authorization", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "jsnode-publication-intent-"));
+  t.after(() => rm(root, {recursive:true,force:true}));
+  const dir = join(root,"services","example");
+  await mkdir(join(dir,"src"),{recursive:true});
+  await writeFile(join(dir,"src","entry.mjs"),"export const value = 1;\n");
+  for (const intent of [{}, {private:false}, {private:true}, {private:"true"}]) {
+    const manifest = {name:"@test/example",type:"module",exports:"./src/entry.mjs",scripts:{check:"node --check src/entry.mjs",test:"node --test"},...intent};
+    await writeManifest(dir,manifest);
+    const before = JSON.stringify(manifest);
+    const report = await checkJsnodePackage({directory:dir});
+    assert.equal(report.findings.find(f=>f.invariantId === "M2").status, typeof intent.private === "string" ? "violation" : "clean");
+    const restriction = report.findings.find(f=>f.invariantId === "M2p");
+    assert.equal(restriction.status,"informational");
+    assert.match(restriction.message,intent.private === true ? /prohibits publication/u : /authorization.*unobserved/u);
+    const witness = report.cells.find(c=>c.object === "M2p");
+    assert.equal(witness.for.length,0); assert.equal(witness.against.length,0);
+    assert.equal(JSON.stringify(manifest),before);
+    const {readFile} = await import("node:fs/promises");
+    assert.deepEqual(JSON.parse(await readFile(join(dir,"package.json"),"utf8")),manifest);
+  }
+});
+
+test("required lifecycle checks remain nonempty without demanding a verify alias", async(t) => {
+  const root = await mkdtemp(join(tmpdir(),"jsnode-lifecycle-intent-"));
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const dir = join(root,"services","example"); await mkdir(join(dir,"src"),{recursive:true});
+  await writeFile(join(dir,"src","entry.mjs"),"export const value = 1;\n");
+  for (const [scripts,status] of [
+    [{check:"node --check src/entry.mjs",test:"node --test"},"clean"],
+    [{check:"node --check src/entry.mjs",test:"node --test",verify:"npm run check && npm test"},"clean"],
+    [{check:"node --check src/entry.mjs"},"violation"],
+    [{check:" ",test:"node --test"},"violation"],
+    [{check:"node --check src/entry.mjs",test:""},"violation"],
+    [{check:"node --check src/entry.mjs",test:"node --test",verify:" "},"violation"],
+  ]) {
+    await writeManifest(dir,{name:"@test/example",type:"module",exports:"./src/entry.mjs",scripts});
+    const report=await checkJsnodePackage({directory:dir});
+    assert.equal(report.findings.find(f=>f.invariantId === "M4").status,status,JSON.stringify(scripts));
+  }
 });

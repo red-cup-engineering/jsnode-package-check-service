@@ -127,11 +127,20 @@ function checkM1(dir, manifest) {
 
 function checkM2(manifest, kind) {
   const faults = [];
-  if (manifest.private !== true) faults.push("private is not true");
+  if (Object.hasOwn(manifest, "private") && typeof manifest.private !== "boolean") faults.push("private must be a boolean when declared");
   if (kind === "jsnode" && manifest.type !== "module") faults.push('type is not "module"');
   return faults.length > 0
     ? finding("M2", "adapted", "violation", faults.join("; "))
-    : finding("M2", "adapted", "clean", "private and, for jsnode packages, type: module");
+    : finding("M2", "adapted", "clean", "publication restriction is well-formed and, for jsnode packages, type: module");
+}
+
+function publicationRestriction(manifest) {
+  // This is observed intent, not publication authority or registry visibility.
+  // npm private:true prohibits publishing to *any* registry; it is not a
+  // universal requirement for the Group's distributable supplier packages.
+  return finding("M2p", "adapted", "informational", manifest.private === true
+    ? "private:true prohibits publication; the restriction must remain intact"
+    : "no private:true publication prohibition declared; publication authorization and destination are unobserved");
 }
 
 function checkM2SideEffects(manifest, kind) {
@@ -271,12 +280,13 @@ function checkM6(manifest, observations) {
 function checkM4(manifest, kind) {
   if (kind === "content-records") return finding("M4", "adapted", "informational", "content package has no JS lifecycle script requirement");
   const scripts = manifest.scripts ?? {};
-  // Adaptation: legacy only required "verify" for the lib/ layer. This tree's
-  // CLAUDE.md states check/test/verify for every package regardless of layer.
-  const wanted = ["check", "test", "verify"];
-  const absent = wanted.filter((s) => typeof scripts[s] !== "string");
+  // The original package producer supplies check/test and its receiver runs
+  // them. A verify alias is not a third independent quality gate. Check its
+  // declaration if present, but never invent an empty compatibility wrapper.
+  const wanted = ["check", "test", ...(Object.hasOwn(scripts, "verify") ? ["verify"] : [])];
+  const absent = wanted.filter((s) => typeof scripts[s] !== "string" || scripts[s].trim().length === 0);
   return absent.length > 0
-    ? finding("M4", "adapted", "violation", `missing scripts: ${absent.join(", ")}`)
+    ? finding("M4", "adapted", "violation", `missing or empty scripts: ${absent.join(", ")}`)
     : finding("M4", "adapted", "clean", `scripts present: ${wanted.join(", ")}`);
 }
 
@@ -512,6 +522,7 @@ export async function checkJsnodePackage({ directory } = {}) {
   const findings = [
     checkM1(dir, manifest),
     checkM2(manifest, kind),
+    publicationRestriction(manifest),
     checkM2SideEffects(manifest, kind),
     checkM3(dir, manifest, exportTargets),
     checkM6(manifest, binTargets),

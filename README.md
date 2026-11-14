@@ -28,6 +28,24 @@ filesystem paths, not URLs. Wildcard expansion and fallback selection remain
 unobserved; this is not a replacement for Node's complete package resolver.
 See [Node package target rules](https://nodejs.org/download/release/v24.22.1/docs/api/packages.html#path-rules-and-validation-for-export-targets).
 
+## Package intent and lifecycle declarations
+
+M2 checks ES-module type for JSNode packages and an optional boolean `private`
+field. `private: true` is an explicit prohibition on publication to any registry,
+not a universal requirement for distributable supplier packages. M2p separately
+reports that restriction, or its absence, as informational: it emits no positive
+publication-authority witness and never changes the manifest. Private repository
+visibility and restricted registry access are separate from this npm flag.
+
+M4 requires nonempty `check` and `test` declarations. An optional `verify` alias
+must also be nonempty if declared, but does not constitute another independent
+quality gate. This matches the original package producer's check/test lifecycle
+without adding compatibility wrappers. A declared command string is not evidence
+it executed or tested the right behavior; native source and consumer receiving
+must establish that separately. Missing required checks and malformed declarations
+remain violations. Explicit no-publication restrictions must not be removed to
+make a package distributable. See [npm private semantics](https://docs.npmjs.com/cli/v10/configuring-npm/package-json/#private).
+
 The established `JsnodePackageCheckReport`, its `JsnodePackageCheckFinding` entries, `violationCount`, and `byConvention` remain available to existing consumers. The additional `cells` array contains **native SignCell** predications `(inspected-source-revision, conforms-to-jsnode-rule, invariant-id)`, with actual source observations on `for` or `against`. SignCell, not this checker, determines their FOUR reading.
 
 Each cell's subject carries the content address of the manifest text, scanned source text, explicitly *uninspected* source entries, observed export-target presence/type/ownership and current checker source. Symlinks and other unresolved source entries cannot silently support a clean source-wide scan; a source-law finding with incomplete coverage remains unknown unless a specific negative witness was actually observed. The witness also identifies the evaluated rule and the selected input fields/inspection domain. Only manifest/file and source checks with recorded observations emit positive/negative witnesses. Retired, skipped, informational, wildcard-unknown or otherwise unobserved rules remain cells with **no evidence**; a report's lack of a violation is not independently a positive fact. A historical `law-allow` comment is not authority to cancel another finding. Those exceptions must be separately asserted and admitted by the actual policy owner.
