@@ -20,13 +20,13 @@ export function sectionOwner(path) {
  */
 export function deriveSectionPackage(path, organizations) {
   const trimmed = path.replace(/\/+$/u, "");
-  const custody = sectionOwner(trimmed);
-  if (custody === null) return { refused: "PATH_DERIVES_NO_CUSTODY", path: trimmed };
-  const organization = organizations[custody];
-  if (typeof organization !== "string" || organization.length === 0) return { refused: "CUSTODY_HAS_NO_ORGANIZATION", path: trimmed, custody };
+  const storage = sectionOwner(trimmed);
+  if (storage === null) return { refused: "PATH_DERIVES_NO_CUSTODY", path: trimmed };
+  const organization = organizations[storage];
+  if (typeof organization !== "string" || organization.length === 0) return { refused: "CUSTODY_HAS_NO_ORGANIZATION", path: trimmed, custody: storage };
   const name = posix.basename(trimmed);
   return {
-    custody,
+    custody: storage,
     organization,
     packageName: `@${organization}/${name}`,
     repository: { type: "git", url: `git+https://github.com/${organization}/${name}.git` },
