@@ -1,8 +1,9 @@
+import { sha256Hex } from "@red-cup-engineering/semiotic-content-address-system";
 import { existsSync, globSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cell } from "@red-cup-engineering/signcell";
 import { surfaceDeclarations } from "./carrier-surface.mjs";
-import { decodePointer, estatePath, OBSERVER, pointer, sha256, testify, witnessOf } from "./observation.mjs";
+import { decodePointer, estatePath, OBSERVER, pointer, testify, witnessOf } from "./observation.mjs";
 import { deriveSectionPackage, mountDeclaration } from "./package-identity.mjs";
 
 const GLOB = /[*?[{]/u;
@@ -101,7 +102,7 @@ export function packageCells({ root, dir, source, organizations }) {
 export function packageName(dir, source) {
   try {
     const name = JSON.parse(source)?.name;
-    return typeof name === "string" ? { dir, name, sha256: sha256(source) } : null;
+    return typeof name === "string" ? { dir, name, sha256: sha256Hex(source) } : null;
   } catch { return null; }
 }
 

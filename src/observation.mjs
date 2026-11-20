@@ -1,3 +1,4 @@
+import { sha256Hex } from "@red-cup-engineering/semiotic-content-address-system";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
@@ -7,7 +8,7 @@ const own = JSON.parse(readFileSync(new URL("../package.json", import.meta.url),
 
 export const OBSERVER = `${own.name}@${own.version}`;
 
-export const sha256 = text => createHash("sha256").update(text, "utf8").digest("hex");
+
 
 export const estatePath = (root, path) => relative(root, path).split(sep).join("/") || ".";
 
@@ -18,7 +19,7 @@ export const decodePointer = segment => segment.replaceAll("~1", "/").replaceAll
 export const pointer = (...keys) => keys.map(key => `/${encodePointer(key)}`).join("");
 
 export const witnessOf = (path, source) => {
-  const digest = source === null ? null : sha256(source);
+  const digest = source === null ? null : sha256Hex(source);
   return (at, observed) => ({ observer: OBSERVER, path, sha256: digest, at, observed });
 };
 
