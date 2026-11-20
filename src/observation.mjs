@@ -1,5 +1,5 @@
 import { sha256Hex } from "@red-cup-engineering/semiotic-content-address-system";
-import { createHash } from "node:crypto";
+
 import { readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { cell } from "@red-cup-engineering/signcell";
