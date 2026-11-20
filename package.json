@@ -24,6 +24,7 @@
     "@red-cup-engineering/jsnode-package-engineering-services-section": "workspace:*"
   },
   "dependencies": {
+    "@red-cup-engineering/git-engine": "^0.1.11-dev.0",
     "@red-cup-engineering/javascript-parser-service": "0.2.2-dev.0",
     "@red-cup-engineering/signcell": "0.18.1-dev.0"
   },

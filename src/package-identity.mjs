@@ -1,3 +1,4 @@
+import { readGitmodules } from "@red-cup-engineering/git-engine/gitmodules";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, posix, relative } from "node:path";
 
@@ -33,7 +34,6 @@ export function deriveSectionPackage(path, organizations) {
   };
 }
 
-const MODULE_PATH = /^[ \t]*path[ \t]*=[ \t]*(.+?)[ \t]*$/gmu;
 
 export function enclosingRepositories(root, directory) {
   const found = [];
@@ -47,7 +47,7 @@ export function gitmodulesDeclarations(repository) {
   const path = join(repository, ".gitmodules");
   if (!existsSync(path)) return { path, source: null, declarations: [] };
   const source = readFileSync(path, "utf8");
-  return { path, source, declarations: [...source.matchAll(MODULE_PATH)].map(match => ({ path: match[1], start: match.index, end: match.index + match[0].length })) };
+  return { path, source, declarations: readGitmodules(repository).map(({ path }) => ({ path, start: 0, end: source.length })) };
 }
 
 export function mountDeclaration(root, directory) {
