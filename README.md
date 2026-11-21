@@ -14,3 +14,14 @@ Observes one Node.js package directory, and the JavaScript files under it, as si
 - `manifestRepair`, `repositoryPlan`, `importerEdits` and `dependentManifestEdits` from `./package-repairs`: exact edits for cells settled told-false, for `computer-code-engine`'s `applyExactSourceEdits`.
 
 The `software-development` command of `software-development-engine` composes these.
+
+## Installed service
+
+The development edition is distributed through the Group npm registry. Fabrication
+imports `withRepositoryField` from `./manifest-field`, and Software Development
+Engine uses the observed cells and exact source repairs. An observed package’s
+`private` declaration remains part of its authored manifest. The original checker
+reports evidence and proposed edits; its callers select which edits to apply.
+
+Run `npm ci` and `npm run verify` in the source checkout to exercise the installed
+interfaces and the Group’s package syntax checker.
