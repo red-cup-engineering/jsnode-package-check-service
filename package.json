@@ -1,6 +1,6 @@
 {
   "name": "@red-cup-engineering/jsnode-package-check-service",
-  "version": "1.0.0-dev.0",
+  "version": "0.1.0-dev.0",
   "private": false,
   "type": "module",
   "description": "Observes a Node.js package directory and its JavaScript sources as signcell cells with witnesses for and against, and plans exact manifest and importer repairs from settled cells.",
