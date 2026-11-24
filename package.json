@@ -15,8 +15,7 @@
   },
   "scripts": {
     "check": "check-package-syntax",
-    "verify": "npm run check && npm test",
-    "test": "node --test test/*.test.mjs"
+    "verify": "npm run check && npm test"
   },
   "engines": {
     "node": ">=24"
