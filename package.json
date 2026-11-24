@@ -1,0 +1,52 @@
+{
+  "name": "@red-cup-engineering/jsnode-package-check-service",
+  "version": "0.1.0-dev.0",
+  "private": false,
+  "type": "module",
+  "description": "Observes a Node.js package directory and its JavaScript sources as signcell cells with witnesses for and against, and plans exact manifest and importer repairs from settled cells.",
+  "exports": {
+    ".": "./src/check-jsnode-package.mjs",
+    "./carrier-surface": "./src/carrier-surface.mjs",
+    "./manifest-field": "./src/manifest-field.mjs",
+    "./package-identity": "./src/package-identity.mjs",
+    "./source-markers": "./src/source-markers.mjs",
+    "./package-repairs": "./src/package-repairs.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "check": "check-package-syntax",
+    "verify": "npm run check && npm test",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@red-cup-engineering/jsnode-package-engineering-services-section": "0.6.6-dev.0 || ^0.6.6"
+  },
+  "dependencies": {
+    "@red-cup-engineering/git-engine": "0.1.11-dev.0 || ^0.1.11",
+    "@red-cup-engineering/javascript-parser-service": "^0.2.1",
+    "@red-cup-engineering/signcell": "^0.18.2",
+    "@red-cup-engineering/semiotic-content-address-system": "^0.1.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/red-cup-engineering/jsnode-package-check-service.git"
+  },
+  "license": "MIT",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/561-group/.github/blob/main/TIPS.md"
+  },
+  "publishConfig": {
+    "registry": "https://registry.561.group/"
+  },
+  "files": [
+    "src",
+    "test/package-checking.test.mjs"
+  ],
+  "receivingTests": [
+    "test/package-checking.test.mjs"
+  ]
+}
